@@ -887,54 +887,70 @@ app.get("/api/supabase/schema", (req, res) => {
 
 // AUTHENTICATION
 app.post("/api/auth/signup", async (req, res) => {
-  const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !role) {
-    return res.status(400).json({ error: "Missing required fields (name, email, password, role)" });
-  }
+  try {
+    const { name, email, password, role } = req.body || {};
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: "Missing required fields (name, email, password, role)" });
+    }
 
-  const cleanEmail = email.toLowerCase().trim();
-  const passwordHash = hashPassword(password);
-  const userId = crypto.randomUUID();
-  const profileId = crypto.randomUUID();
+    if (!supabase) {
+      return res.status(503).json({ error: "Database not connected. Please contact admin." });
+    }
 
-  // Check Supabase users_auth table directly if connected
-  if (supabase) {
+    const cleanEmail = String(email).toLowerCase().trim();
+    const passwordHash = hashPassword(String(password));
+    const userId = crypto.randomUUID();
+    const profileId = crypto.randomUUID();
+
+    // Check if email already registered
+    const { data: existingUser, error: checkErr } = await supabase
+      .from("users_auth")
+      .select("id")
+      .eq("email", cleanEmail)
+      .maybeSingle();
+
+    if (checkErr) {
+      if (checkErr.code === "PGRST205" || checkErr.message?.includes("Could not find the table")) {
+        return res.status(503).json({ error: "Database tables not set up yet. Please run supabase_schema.sql in Supabase SQL Editor." });
+      }
+      console.error("Signup check error:", checkErr);
+      return res.status(500).json({ error: "Database error during signup" });
+    }
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    // Insert into users_auth
+    const { error: authErr } = await supabase.from("users_auth").insert({
+      id: userId,
+      email: cleanEmail,
+      password_hash: passwordHash
+    });
+
+    if (authErr) {
+      console.error("Error inserting to users_auth:", authErr.message);
+      return res.status(500).json({ error: "Failed to create user account: " + authErr.message });
+    }
+
+    // Insert into users_profile
+    const newUserProfile = {
+      id: profileId,
+      user_id: userId,
+      name: String(name),
+      role: String(role),
+      email: cleanEmail,
+      created_at: new Date().toISOString()
+    };
+
+    const { error: profileErr } = await supabase.from("users_profile").insert(newUserProfile);
+    if (profileErr) {
+      console.error("Error inserting to users_profile:", profileErr.message);
+      // Don't fail — auth was created, profile can be auto-created on next login
+    }
+
+    // Pre-populate default hospital bag checklist
     try {
-      const { data: existingUser } = await supabase
-        .from("users_auth")
-        .select("id")
-        .eq("email", cleanEmail)
-        .maybeSingle();
-
-      if (existingUser) {
-        return res.status(400).json({ error: "Email already registered in Supabase" });
-      }
-
-      // Insert directly into Supabase users_auth
-      const { error: authErr } = await supabase.from("users_auth").insert({
-        id: userId,
-        email: cleanEmail,
-        password_hash: passwordHash
-      });
-
-      if (authErr) {
-        console.error("Error inserting to Supabase users_auth:", authErr.message);
-      }
-
-      // Insert directly into Supabase users_profile
-      const { error: profileErr } = await supabase.from("users_profile").insert({
-        id: profileId,
-        user_id: userId,
-        name,
-        role,
-        email: cleanEmail
-      });
-
-      if (profileErr) {
-        console.error("Error inserting to Supabase users_profile:", profileErr.message);
-      }
-
-      // Pre-populate default hospital bag checklist in Supabase
       const bagItems = DEFAULT_HOSPITAL_BAG_ITEMS.map((item) => ({
         id: crypto.randomUUID(),
         user_id: userId,
@@ -945,38 +961,24 @@ app.post("/api/auth/signup", async (req, res) => {
         created_at: new Date().toISOString()
       }));
       await supabase.from("hospital_bag_checklist").insert(bagItems);
-
-    } catch (e: any) {
-      console.error("Supabase direct signup error:", e?.message || e);
+    } catch (bagErr: any) {
+      console.error("Error pre-populating hospital bag:", bagErr?.message);
     }
-  }
 
-  // Also store in local DB for fallback cache
-  const db = getDB();
-  db.users_auth.push({ id: userId, email: cleanEmail, passwordHash, rawPassword: password });
-  const newUserProfile = { id: profileId, user_id: userId, name, role, email: cleanEmail, created_at: new Date().toISOString() };
-  db.users_profile.push(newUserProfile);
+    // Log activity (non-critical, don't crash on failure)
+    try {
+      logActivity(userId, "signup", `Joined Kunju Baby's as ${role === "husband" ? "Husband" : "Wife"}`);
+    } catch (_) {}
 
-  DEFAULT_HOSPITAL_BAG_ITEMS.forEach((item) => {
-    db.hospital_bag_checklist.push({
-      id: crypto.randomUUID(),
-      user_id: userId,
-      item_name: item.item_name,
-      category: item.category,
-      is_packed: false,
-      is_custom: false,
-      created_at: new Date().toISOString()
+    return res.status(201).json({
+      message: "User registered successfully",
+      user: newUserProfile,
+      token: userId
     });
-  });
-  saveDB(db);
-
-  logActivity(userId, "signup", `Joined Kunju Baby's as ${role === "husband" ? "Husband" : "Wife"}`);
-
-  return res.status(201).json({
-    message: "User registered successfully",
-    user: newUserProfile,
-    token: userId
-  });
+  } catch (err: any) {
+    console.error("Signup Error:", err);
+    return res.status(500).json({ error: err?.message || "Internal server error during signup" });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
