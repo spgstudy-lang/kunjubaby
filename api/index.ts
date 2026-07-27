@@ -1,5 +1,29 @@
-import serverless from "serverless-http";
-import app from "../server";
+let appInstance: any = null;
 
-// Force Vercel rebuild: 2026-07-27T21:39:55.687Z
-export default serverless(app);
+export default async function (req: any, res: any) {
+  try {
+    if (!appInstance) {
+      let m: any;
+      try {
+        m = await import("../server.js");
+      } catch (e1) {
+        try {
+          m = await import("../server");
+        } catch (e2: any) {
+          throw new Error(`Failed to load server module. e1: ${e1?.message}, e2: ${e2?.message}`);
+        }
+      }
+      appInstance = m.default || m;
+    }
+    return appInstance(req, res);
+  } catch (err: any) {
+    console.error("Vercel Startup Error:", err);
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({
+      error: "Vercel Startup Error",
+      message: err?.message || String(err),
+      stack: err?.stack || null
+    }));
+  }
+}
