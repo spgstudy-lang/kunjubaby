@@ -2,6 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
+// Vercel Serverless Express Handler v2.0 - 2026-07-27T22:53:00Z
 let _app: any = null;
 
 function getApp() {
