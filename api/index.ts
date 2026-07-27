@@ -1,5 +1,5 @@
 import serverless from "serverless-http";
 import app from "../server";
 
-// Vercel deployment trigger: 2026-07-27T22:13:00Z
+// Force Vercel rebuild: 2026-07-27T21:13:32.770Z
 export default serverless(app);
