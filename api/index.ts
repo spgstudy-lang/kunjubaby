@@ -1,5 +1,5 @@
+import serverless from "serverless-http";
 import app from "../server";
 
-export default function (req: any, res: any) {
-  return app(req, res);
-}
+// Force Vercel rebuild: 2026-07-27T21:39:55.687Z
+export default serverless(app);
