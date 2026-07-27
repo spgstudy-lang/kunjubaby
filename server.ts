@@ -991,93 +991,81 @@ app.post("/api/auth/login", async (req, res) => {
 
     const passwordHash = hashPassword(cleanPassword);
 
-    // Fast-path Admin Login Fallback
-    if (cleanEmail === ADMIN_EMAIL.toLowerCase() && (cleanPassword === "225500" || passwordHash === ADMIN_PASSWORD_HASH)) {
-      const db = getDB();
-      let adminProfile = db.users_profile.find((p: any) => p.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() || p.user_id === ADMIN_USER_ID);
-      if (!adminProfile) {
-        adminProfile = {
+    // ── 1. Admin fast-path (works even if Supabase tables not created yet) ──
+    if (cleanEmail === ADMIN_EMAIL.toLowerCase() &&
+        (cleanPassword === "225500" || passwordHash === ADMIN_PASSWORD_HASH)) {
+      logActivity(ADMIN_USER_ID, "login", "Logged in as Admin");
+      return res.json({
+        message: "Logged in successfully",
+        token: ADMIN_USER_ID,
+        user: {
           id: ADMIN_PROFILE_ID,
           user_id: ADMIN_USER_ID,
           name: "Syam (Admin)",
           role: "admin",
           email: ADMIN_EMAIL,
           created_at: new Date().toISOString()
-        };
-        db.users_profile.push(adminProfile);
-        saveDB(db);
-      }
-      logActivity(ADMIN_USER_ID, "login", "Logged in as Admin");
-      return res.json({
-        message: "Logged in successfully",
-        token: ADMIN_USER_ID,
-        user: adminProfile
+        }
       });
     }
 
-    let profile = null;
-    let authUserId = null;
-
-    // DIRECT SUPABASE AUTHENTICATION USING users_auth TABLE
-    if (supabase) {
-      try {
-        const { data: authUser, error: authError } = await supabase
-          .from("users_auth")
-          .select("*")
-          .eq("email", cleanEmail)
-          .maybeSingle();
-
-        if (authUser) {
-          const matchPassword =
-            authUser.password_hash === passwordHash ||
-            authUser.passwordHash === passwordHash ||
-            authUser.password_hash === cleanPassword;
-
-          if (matchPassword) {
-            authUserId = authUser.id;
-            const { data: userProfile } = await supabase
-              .from("users_profile")
-              .select("*")
-              .eq("user_id", authUserId)
-              .maybeSingle();
-
-            if (userProfile) {
-              profile = userProfile;
-            } else {
-              profile = {
-                id: crypto.randomUUID(),
-                user_id: authUserId,
-                name: cleanEmail.split("@")[0],
-                role: "wife",
-                email: cleanEmail,
-                created_at: authUser.created_at || new Date().toISOString()
-              };
-              await supabase.from("users_profile").insert(profile);
-            }
-          } else {
-            return res.status(401).json({ error: "Invalid email or password" });
-          }
-        }
-      } catch (err: any) {
-        console.error("Supabase direct users_auth login error:", err);
-      }
+    // ── 2. Supabase authentication (primary path for all users) ──
+    if (!supabase) {
+      return res.status(503).json({ error: "Database not connected. Please contact admin." });
     }
 
-    // Local DB fallback
-    if (!profile) {
-      const db = getDB();
-      const authUser = db.users_auth.find((u: any) => u.email.toLowerCase() === cleanEmail);
+    // Query users_auth
+    const { data: authUser, error: authError } = await supabase
+      .from("users_auth")
+      .select("*")
+      .eq("email", cleanEmail)
+      .maybeSingle();
 
-      if (!authUser || (authUser.passwordHash !== passwordHash && authUser.password_hash !== passwordHash)) {
-        return res.status(401).json({ error: "Invalid email or password" });
+    if (authError) {
+      // Table doesn't exist yet → guide user
+      if (authError.code === "PGRST205" || authError.message?.includes("Could not find the table")) {
+        console.error("users_auth table missing in Supabase. Run supabase_schema.sql first.");
+        return res.status(503).json({
+          error: "Database tables not set up yet. Please run supabase_schema.sql in Supabase SQL Editor."
+        });
       }
-
-      authUserId = authUser.id;
-      profile = db.users_profile.find((p: any) => p.user_id === authUserId || p.id === authUserId || p.email.toLowerCase() === cleanEmail);
+      console.error("Supabase auth query error:", authError);
+      return res.status(500).json({ error: "Database error during login" });
     }
 
-    if (!profile) {
+    if (!authUser) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Verify password
+    const passwordMatches =
+      authUser.password_hash === passwordHash ||
+      authUser.password_hash === cleanPassword;
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const authUserId = authUser.id;
+
+    // Fetch or create profile
+    let { data: profile } = await supabase
+      .from("users_profile")
+      .select("*")
+      .eq("user_id", authUserId)
+      .maybeSingle();
+
+    if (!profile) {
+      // Auto-create profile if missing
+      profile = {
+        id: crypto.randomUUID(),
+        user_id: authUserId,
+        name: cleanEmail.split("@")[0],
+        role: "wife",
+        email: cleanEmail,
+        created_at: new Date().toISOString()
+      };
+      await supabase.from("users_profile").insert(profile);
     }
 
     logActivity(authUserId, "login", "Logged in");
@@ -1087,6 +1075,7 @@ app.post("/api/auth/login", async (req, res) => {
       token: authUserId,
       user: profile
     });
+
   } catch (err: any) {
     console.error("Login Error:", err);
     return res.status(500).json({ error: err?.message || "Internal server error during login" });
