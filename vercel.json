@@ -1,0 +1,24 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "db.json"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api|uploads).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
