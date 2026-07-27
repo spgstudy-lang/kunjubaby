@@ -1,0 +1,27 @@
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Missing required fields (email, password)" });
+  }
+
+  const db = getDB();
+  const authUser = db.users_auth.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+  if (!authUser) {
+    return res.status(401).json({ error: "Invalid email or password" });
+  }
+
+  const passwordHash = hashPassword(password);
+  if (authUser.passwordHash !== passwordHash) {
+    return res.status(401).json({ error: "Invalid email or password" });
+  }
+
+  const profile = db.users_profile.find((p: any) => p.user_id === authUser.id);
+  if (!profile) {
+    return res.status(500).json({ error: "User profile not found" });
+  }
+
+  logActivity(profile.user_id, "login", `Logged in`);
+
+  res.json({
+    message: "Logged in successfully",
+    token: profile.user_id, // simple user_id acts as bearer token
