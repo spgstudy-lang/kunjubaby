@@ -1,0 +1,6 @@
+{
+  "name": "Kunju Baby's",
+  "description": "A comprehensive pregnancy and baby tracking application for parents to monitor scans, appointments, finances, shopping lists, and journals.",
+  "requestFramePermissions": ["notification"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
