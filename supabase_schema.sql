@@ -224,24 +224,44 @@ DROP POLICY IF EXISTS "Allow public full access" ON public.general_notes;
 CREATE POLICY "Allow public full access" ON public.general_notes FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
--- Seed Admin User (safe to re-run)
--- Email: syam@gmail.com | Password: 225500
--- SHA256 hash of "225500"
+-- Seed Users (safe to re-run)
+-- All users: password = 225500
+-- SHA-256 hash of "225500" = d90ad6c66953acc6bdf19a2b088bc15de4bb9c34f1611897e3fccc07c6acd6a2
 -- ============================================================
 DO $$
 DECLARE
-    v_admin_user_id UUID := '00000000-0000-0000-0000-000000000001'::uuid;
+    v_admin_user_id    UUID := '00000000-0000-0000-0000-000000000001'::uuid;
     v_admin_profile_id UUID := '00000000-0000-0000-0000-000000000002'::uuid;
+    v_husband_user_id  UUID := '00000000-0000-0000-0000-000000000003'::uuid;
+    v_husband_profile_id UUID := '00000000-0000-0000-0000-000000000004'::uuid;
+    v_wife_user_id     UUID := '00000000-0000-0000-0000-000000000005'::uuid;
+    v_wife_profile_id  UUID := '00000000-0000-0000-0000-000000000006'::uuid;
+    v_pw_hash          TEXT := 'd90ad6c66953acc6bdf19a2b088bc15de4bb9c34f1611897e3fccc07c6acd6a2';
 BEGIN
-    -- Insert admin auth if not exists
-    IF NOT EXISTS (SELECT 1 FROM public.users_auth WHERE id = v_admin_user_id) THEN
-        INSERT INTO public.users_auth (id, email, password_hash)
-        VALUES (v_admin_user_id, 'syam@gmail.com', '7fbc2867851978eb32c4bca2e05a80530ffbe1f1bbfed12521c7c9071a9a8385');
-    END IF;
+    -- Admin: syam@gmail.com
+    INSERT INTO public.users_auth (id, email, password_hash)
+    VALUES (v_admin_user_id, 'syam@gmail.com', v_pw_hash)
+    ON CONFLICT (id) DO UPDATE SET password_hash = v_pw_hash;
 
-    -- Insert admin profile if not exists
-    IF NOT EXISTS (SELECT 1 FROM public.users_profile WHERE id = v_admin_profile_id) THEN
-        INSERT INTO public.users_profile (id, user_id, name, role, email)
-        VALUES (v_admin_profile_id, v_admin_user_id, 'Syam (Admin)', 'admin', 'syam@gmail.com');
-    END IF;
+    INSERT INTO public.users_profile (id, user_id, name, role, email)
+    VALUES (v_admin_profile_id, v_admin_user_id, 'Syam (Admin)', 'admin', 'syam@gmail.com')
+    ON CONFLICT (id) DO NOTHING;
+
+    -- Husband: syamprasadg@outlook.com
+    INSERT INTO public.users_auth (id, email, password_hash)
+    VALUES (v_husband_user_id, 'syamprasadg@outlook.com', v_pw_hash)
+    ON CONFLICT (id) DO UPDATE SET password_hash = v_pw_hash;
+
+    INSERT INTO public.users_profile (id, user_id, name, role, email)
+    VALUES (v_husband_profile_id, v_husband_user_id, 'Syam Prasad', 'husband', 'syamprasadg@outlook.com')
+    ON CONFLICT (id) DO NOTHING;
+
+    -- Wife: harithak26598@gmail.com
+    INSERT INTO public.users_auth (id, email, password_hash)
+    VALUES (v_wife_user_id, 'harithak26598@gmail.com', v_pw_hash)
+    ON CONFLICT (id) DO UPDATE SET password_hash = v_pw_hash;
+
+    INSERT INTO public.users_profile (id, user_id, name, role, email)
+    VALUES (v_wife_profile_id, v_wife_user_id, 'Haritha', 'wife', 'harithak26598@gmail.com')
+    ON CONFLICT (id) DO NOTHING;
 END $$;
