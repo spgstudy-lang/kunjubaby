@@ -3,7 +3,6 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -31,10 +30,18 @@ const ADMIN_USER_ID      = "00000000-0000-0000-0000-000000000001";
 const ADMIN_PROFILE_ID   = "00000000-0000-0000-0000-000000000002";
 const ADMIN_PW_HASH      = crypto.createHash("sha256").update("225500").digest("hex");
 
-// ─── Gemini AI ────────────────────────────────────────────────────────────────
-let ai: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { headers: { "User-Agent": "aistudio-build" } } });
+// ─── Gemini AI (lazy dynamic import to avoid ESM conflicts on Vercel) ─────────
+let _aiInstance: any = null;
+async function getAI(): Promise<any | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+  if (_aiInstance) return _aiInstance;
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    _aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { headers: { "User-Agent": "aistudio-build" } } });
+  } catch (e) {
+    console.error("Failed to load @google/genai:", e);
+  }
+  return _aiInstance;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -785,6 +792,7 @@ app.post("/api/ai/chat", authenticateUser, async (req, res) => {
     const { message, history } = req.body || {};
     if (!message) return fail(res, "Message is required", 400);
 
+    const ai = await getAI();
     if (!ai) {
       return ok(res, {
         response: "AI Advisor is not configured. Please add a GEMINI_API_KEY environment variable in your Vercel settings.",
