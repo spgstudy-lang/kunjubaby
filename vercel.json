@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "db.json"
+      "maxDuration": 30
     }
   },
   "rewrites": [
@@ -19,6 +19,10 @@
       "source": "/((?!api|uploads).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "SUPABASE_URL": "https://zawnmkvqbrdeiqgsfxzg.supabase.co",
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphd25ta3ZxYnJkZWlxZ3NmeHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTE3NjcxMCwiZXhwIjoyMTAwNzUyNzEwfQ.WFetvohX0TpWBUTh7EEEMohdnlNNoeSidwu3l3UJioY",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphd25ta3ZxYnJkZWlxZ3NmeHpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxNzY3MTAsImV4cCI6MjEwMDc1MjcxMH0.TELPt2ZSa1ZWq_b6ORpr80hM_UGZwS9MKhRexMGVIRg"
+  }
 }
-
