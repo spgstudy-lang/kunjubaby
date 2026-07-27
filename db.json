@@ -1,0 +1,31 @@
+{
+  "users_profile": [
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "user_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Syam (Admin)",
+      "role": "admin",
+      "email": "syam@gmail.com",
+      "created_at": "2026-07-27T14:19:23.228Z"
+    }
+  ],
+  "users_auth": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "email": "syam@gmail.com",
+      "passwordHash": "7fbc2867851978eb32c4bca2e05a80530ffbe1f1bbfed12521c7c9071a9a8385",
+      "rawPassword": "225500"
+    }
+  ],
+  "scans": [],
+  "appointments": [],
+  "finances": [],
+  "shopping_list": [],
+  "hospital_bag_checklist": [],
+  "journal_notes": [],
+  "reminders": [],
+  "activity_logs": [],
+  "baby_gallery": [],
+  "general_folders": [],
+  "general_notes": []
+}
